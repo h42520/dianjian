@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>仪器设备点检系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f2f5;color:#333;padding-bottom:60px}
+.header{background:#1a73e8;color:#fff;padding:16px;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header h1{font-size:20px;font-weight:600;letter-spacing:1px}
+.container{max-width:800px;margin:0 auto;padding:12px}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.instrument-selector{margin-bottom:12px}
+.instrument-selector select{width:100%;padding:12px;font-size:16px;border:2px solid #ddd;border-radius:8px;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 12px center;background-size:12px}
+.instrument-selector select:focus{border-color:#1a73e8;outline:none}
+.calendar-nav{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.calendar-nav select{padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:15px;background:#fff}
+.calendar-nav button{padding:8px 16px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer}
+.calendar-nav button:disabled{opacity:.5;cursor:not-allowed}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px}
+.calendar-grid .day-header{text-align:center;font-weight:600;color:#666;padding:6px 0;font-size:13px}
+.calendar-grid .day-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;cursor:default;font-size:14px;position:relative;transition:.1s;min-height:40px}
+.calendar-grid .day-cell.today{background:#e8f0fe;font-weight:700;border:2px solid #1a73e8}
+.calendar-grid .day-cell.future{color:#ccc;cursor:not-allowed;background:#fafafa}
+.calendar-grid .day-cell.past{cursor:pointer;background:#fff;border:1px solid #eee}
+.calendar-grid .day-cell.past:hover{background:#e8f0fe}
+.calendar-grid .day-cell.selected{background:#1a73e8;color:#fff;font-weight:700}
+.calendar-grid .day-cell.has-record::after{content:'';position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%}
+.calendar-grid .day-cell.has-record.normal::after{background:#34a853}
+.calendar-grid .day-cell.has-record.abnormal::after{background:#ea4335}
+.checklist{margin-top:12px}
+.check-item{display:flex;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0f0f0;gap:8px}
+.check-item:last-child{border-bottom:none}
+.check-item .item-text{flex:1;font-size:14px;line-height:1.5;word-break:break-word}
+.check-item .options{display:flex;gap:4px;flex-shrink:0}
+.check-item .options label{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:2px solid #ddd;cursor:pointer;font-size:16px;font-weight:700;transition:.15s;user-select:none;background:#fff}
+.check-item .options input[type="radio"]{display:none}
+.check-item .options input[type="radio"]:checked + label{color:#fff;border-color:transparent}
+.check-item .options input[type="radio"][value="ok"]:checked + label{background:#34a853}
+.check-item .options input[type="radio"][value="ng"]:checked + label{background:#ea4335}
+.check-item .options input[type="radio"][value="other"]:checked + label{background:#fbbc04;color:#333}
+.check-item .options label:hover{border-color:#999}
+.signature-area{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #ddd}
+.signature-area input{flex:1;min-width:120px;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:15px}
+.signature-area textarea{width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-size:15px;resize:vertical;min-height:60px}
+.submit-btn{width:100%;padding:14px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:18px;font-weight:600;cursor:pointer;margin-top:12px}
+.submit-btn:disabled{background:#aaa;cursor:not-allowed}
+.export-bar{display:flex;gap:8px;margin-top:12px}
+.export-bar button{flex:1;padding:10px;background:#fff;border:2px solid #1a73e8;color:#1a73e8;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600}
+.export-bar button:hover{background:#e8f0fe}
+.qr-section{text-align:center;margin-top:20px;padding:16px;background:#fff;border-radius:12px}
+.qr-section img{width:180px;height:180px;margin:0 auto;display:block}
+.qr-section p{font-size:13px;color:#888;margin-top:8px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 24px;border-radius:8px;font-size:15px;z-index:999;display:none;animation:fadeInOut 2s}
+@keyframes fadeInOut{0%{opacity:0}15%{opacity:1}85%{opacity:1}100%{opacity:0}}
+@media (max-width:480px){
+  .header h1{font-size:17px}
+  .check-item .options label{width:32px;height:32px;font-size:14px}
+  .calendar-grid .day-cell{font-size:12px;min-height:34px}
+}
+</style>
+</head>
+<body>
+
+<div class="header"><h1>📋 仪器设备点检系统</h1></div>
+<div class="container">
+
+<div class="card instrument-selector">
+  <select id="instrumentSelect"><option value="">-- 请选择仪器 --</option></select>
+</div>
+
+<div class="card calendar-nav">
+  <select id="yearSelect"></select>
+  <select id="monthSelect"></select>
+  <button id="todayBtn">今天</button>
+</div>
+
+<div class="card" id="calendarContainer">
+  <div class="calendar-grid" id="calendarGrid"></div>
+</div>
+
+<div class="card" id="checklistCard" style="display:none">
+  <div id="checklistItems"></div>
+  <div class="signature-area">
+    <input type="text" id="operatorInput" placeholder="操作者（必填）" required>
+    <input type="text" id="supervisorInput" placeholder="督导（必填）" required>
+  </div>
+  <textarea id="remarkInput" placeholder="备注（异常说明等）"></textarea>
+  <button class="submit-btn" id="submitBtn" disabled>提交点检结果</button>
+</div>
+
+<div class="export-bar">
+  <button id="exportMonthBtn">📥 导出本月Excel</button>
+  <button id="printBtn">🖨️ 打印</button>
+</div>
+
+<div class="qr-section">
+  <img id="qrImg" src="" alt="二维码">
+  <p>扫码进入点检系统</p>
+  <div style="margin-top:8px;font-size:12px;color:#aaa" id="siteUrlDisplay"></div>
+</div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const instruments = [
+  {id:"NLD-A285",name:"高性能电池检测系统",items:["1.是否保持工作台清洁","2.运行是否正常是否异响","3.是否有锋利零件刮伤工作台","4.仪器开机运行时，仪器指示灯是否正常亮起","5.保持设备干燥（雨水、潮气和各种液体或水分都可能会腐蚀电子线路）"]},
+  {id:"NLD-B141",name:"电声测试仪",items:["1.仪器外部表面保持清洁","2.开机运行显示是否正常存在异响","3.标准样品灵敏度电流测试是否正常","4.测试设定是否相符","5.不使用时须关闭电源"]},
+  {id:"NLD-A211",name:"耳机拉伸寿命实验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.转动轴是否定期加润滑油"]},
+  {id:"NLD-A211-2",name:"耳机头带扭转寿命机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行时计数是否正常","5.不使用时须关闭电源"]},
+  {id:"NLD-A210",name:"头戴滑行寿命实验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.转动轴是否定期加润滑油"]},
+  {id:"NLD-A212",name:"头戴扩张力实验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.转动轴是否定期加润滑油"]},
+  {id:"NLD-A200",name:"按键寿命机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行时计数开关是否正常","5.不使用时须关闭电源","6.上下活动轴是否定期加润滑油"]},
+  {id:"NLD-A213",name:"酒精耐磨擦拭实验机",items:["1.外部表面保持清洁","2.开启电源力度速度计数是否正常","3.转轴运行是否正常","4.不使用时须关闭电源","5.转盘转动轴是否定期加润滑油"]},
+  {id:"NLD-A094",name:"插拔实验机",items:["1.外部表面保持清洁","2.开启电源力度速度计数是否正常","3.转轴运行是否正常","4.不使用时须关闭电源","5.转盘转动轴是否定期加润滑油"]},
+  {id:"NLD-A056",name:"噪声信号发生器",items:["1.外部表面保持清洁","2.各连接线导通是否良好","3.各测试档位调试设定是否相符","4.不使用时须关闭电源"]},
+  {id:"NLD-A296",name:"触摸屏耳机折叠寿命试验机",items:["1.外部表面保持清洁","2.活动轴是否定期加润滑油","3.各连接线、电源线是否良好","4.各显示屏显示、按键、仪器工作是否正常有异响"]},
+  {id:"NLD-A243",name:"微电脑拉力试验机",items:["1.外部表面保持清洁","2.开启电源后各开关按键是否正常","3.运行是否正常是否异响","4.测试完须关闭电源","5.转动轴是否定期加润滑油"]},
+  {id:"NLD-A242",name:"静态吊重拉力机",items:["1.外部表面保持清洁","2.开启电源后各开关按键是否正常","3.运行是否正常是否异响","4.测试完须关闭电源","5.转动轴是否定期加润滑油"]},
+  {id:"NLD-A217",name:"线材弯折试验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.摇摆转动轴是否定期加润滑油"]},
+  {id:"NLD-A218",name:"线材弯折试验机(2)",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.摇摆转动轴是否定期加润滑油"]},
+  {id:"NLD-A241",name:"360度折弯实验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.摇摆转动轴是否定期加润滑油"]},
+  {id:"NLD-A068",name:"盐雾试验机",items:["1.外部表面保持清洁","2.开启后温度气压是否正常（实验室温度：35° / 压力桶温度：47° / 喷雾压力：0.1Mpa或14.69psi，客户有要求按客户标准）","3.打开喷雾开关喷雾是否正常","4.设定测试值是否相符","5.箱水位盐雾量盒子水位是否正常","6.测试完须打开除雾关闭电源","7.量杯每/小时收集喷雾量","8.量杯喷雾量，每4小时点检一次"]},
+  {id:"NLD-A193",name:"滚筒跌落试验机",items:["1.外部表面保持清洁","2.开启电源后各开关按键是否正常","3.运行是否正常是否异响","4.测试完须关闭电源","5.滚筒转动轴是否定期加润滑油"]},
+  {id:"NLD-A220",name:"冷热冲击试验箱",items:["1.外部表面保持清洁","2.开启电源显示屏是否正常","3.开启运行是否正常是否有异响","4.电源接地线是否良好","5.不使用时须关闭电源","6.水箱水位是否正常不可过少"]},
+  {id:"NLD-A346",name:"可程式恒温恒湿试验箱",items:["1.外部表面保持清洁","2.开启电源显示屏是否正常","3.开启运行是否正常是否有异响","4.电源接地线是否良好","5.不使用时须关闭电源","6.水箱水位是否正常不可过少"]},
+  {id:"NLD-A194",name:"模拟运输振动台",items:["1.外部表面保持清洁","2.不可放置大于100KG的负载","3.调节转速时应缓慢进行","4.使用完须关闭电源"]},
+  {id:"NLD-A214",name:"单翼跌落实验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.按键开关是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.转动轴是否定期加润滑油"]},
+  {id:"NLD-B284",name:"静电放电发生器",items:["1.工作台、仪器是否保持清洁","2.清洁工作台、仪器时是否有划伤现象","3.仪器运行是否正常","4.仪器不要在潮湿条件下使用，以防电击","5.仪器长时间不使用时请切断电源"]},
+  {id:"NLD-A262",name:"影像测试仪OMM",items:["1.是否保持工作台清洁","2.是否有锋利零件刮伤工作台或刮花玻璃","3.测量零件需要把Z-轴调低时，要注意不要让零件顶到镜头，以免影响精度","4.移动工作台时不要用力过猛，以免撞伤工作台限位快引起精度下降","5.如镜头镜片弄脏，请使用专门镜片清洁剂，而不要使用有机溶液（如酒精、乙醚）擦拭，以免溶解镜头表面镀膜层","6.电脑为仪器测试软件专用，请禁止使用U盘、禁止连接外网或做其他与本仪器无关的功能使用，如出现故障及时与厂商联系","7.本仪器未附任何维修零件，为避免损坏（指测量精确度），请勿任意拆卸所以部件，若需服务请专业或被授权人员联系"]},
+  {id:"NLD-A368",name:"纸带耐磨试验机",items:["1.外部表面保持清洁","2.开启电源显示屏指示灯是否正常","3.开关柄是否正常","4.运行是否正常是否异响","5.不使用时须关闭电源","6.转动轴是否正常"]},
+  {id:"NLD-A374",name:"紫外光加速老化试验箱",items:["1.外部表面保持清洁","2.开启电源显示屏是否正常","3.开启运行是否正常是否有异响","4.电源接地线是否良好","5.不使用时须关闭电源","6.水箱水位是否正常不可过少","7.灯管是否正常亮起"]}
+];
+
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth() + 1;
+let selectedDate = null;
+let currentInstrumentId = '';
+let records = {};
+
+function init() {
+  loadRecords();
+  populateSelectors();
+  renderCalendar();
+  updateQRCode();
+}
+
+function loadRecords() {
+  try {
+    const stored = localStorage.getItem('dianjian_records');
+    if (stored) records = JSON.parse(stored);
+  } catch(e) {}
+}
+
+function saveRecords() {
+  localStorage.setItem('dianjian_records', JSON.stringify(records));
+}
+
+function populateSelectors() {
+  const sel = document.getElementById('instrumentSelect');
+  sel.innerHTML = '<option value="">-- 请选择仪器 --</option>';
+  instruments.forEach((inst) => {
+    const opt = document.createElement('option');
+    opt.value = inst.id;
+    opt.textContent = inst.id + ' ' + inst.name;
+    sel.appendChild(opt);
+  });
+
+  const yearSel = document.getElementById('yearSelect');
+  yearSel.innerHTML = '';
+  for(let y=2024; y<=2030; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y + '年';
+    if(y === currentYear) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+
+  const monthSel = document.getElementById('monthSelect');
+  monthSel.innerHTML = '';
+  for(let m=1; m<=12; m++) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m + '月';
+    if(m === currentMonth) opt.selected = true;
+    monthSel.appendChild(opt);
+  }
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const firstDay = new Date(currentYear, currentMonth-1, 1).getDay();
+  const todayStr = dateStr(new Date());
+
+  const weekdays = ['日','一','二','三','四','五','六'];
+  weekdays.forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'day-header';
+    div.textContent = d;
+    grid.appendChild(div);
+  });
+
+  for(let i=0; i<firstDay; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'day-cell';
+    grid.appendChild(empty);
+  }
+
+  for(let day=1; day<=daysInMonth; day++) {
+    const date = new Date(currentYear, currentMonth-1, day);
+    const dateStrVal = dateStr(date);
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    cell.dataset.date = dateStrVal;
+
+    if(dateStrVal === todayStr) cell.classList.add('today');
+
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    if(date > now) {
+      cell.classList.add('future');
+    } else {
+      cell.classList.add('past');
+    }
+
+    if(dateStrVal === selectedDate) cell.classList.add('selected');
+
+    const recordKey = getRecordKey(currentInstrumentId, dateStrVal);
+    if(records[recordKey]) {
+      cell.classList.add('has-record');
+      let hasAbnormal = false;
+      const rec = records[recordKey];
+      if(rec.items) {
+        for(const key in rec.items) {
+          if(rec.items[key] === 'ng') { hasAbnormal = true; break; }
+        }
+      }
+      cell.classList.add(hasAbnormal ? 'abnormal' : 'normal');
+    }
+
+    cell.textContent = day;
+
+    if(!cell.classList.contains('future')) {
+      cell.addEventListener('click', function(e) {
+        e.stopPropagation();
+        selectedDate = this.dataset.date;
+        renderCalendar();
+        loadChecklistForDate(selectedDate);
+      });
+    }
+
+    grid.appendChild(cell);
+  }
+}
+
+function dateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + day;
+}
+
+function getRecordKey(instrId, dateStrVal) {
+  return instrId + '_' + dateStrVal;
+}
+
+function loadChecklistForDate(dateStrVal) {
+  const card = document.getElementById('checklistCard');
+  const container = document.getElementById('checklistItems');
+
+  if(!currentInstrumentId || !dateStrVal) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const inst = instruments.find(i => i.id === currentInstrumentId);
+  if(!inst) {
+    card.style.display = 'none';
+    showToast('请先选择仪器');
+    return;
+  }
+
+  card.style.display = 'block';
+  const recordKey = getRecordKey(currentInstrumentId, dateStrVal);
+  const existing = records[recordKey] || {items:{}, operator:'', supervisor:'', remark:''};
+
+  let html = '<div style="font-weight:600;margin-bottom:8px;color:#1a73e8">📅 ' + dateStrVal + ' · ' + inst.id + ' ' + inst.name + '</div>';
+  inst.items.forEach((item, idx) => {
+    const val = existing.items[idx] || '';
+    html += `
+      <div class="check-item">
+        <div class="item-text">${item}</div>
+        <div class="options">
+          <input type="radio" name="item_${idx}" id="ok_${idx}" value="ok" ${val==='ok'?'checked':''}>
+          <label for="ok_${idx}" style="color:#34a853">✓</label>
+          <input type="radio" name="item_${idx}" id="ng_${idx}" value="ng" ${val==='ng'?'checked':''}>
+          <label for="ng_${idx}" style="color:#ea4335">✗</label>
+          <input type="radio" name="item_${idx}" id="other_${idx}" value="other" ${val==='other'?'checked':''}>
+          <label for="other_${idx}" style="color:#fbbc04">△</label>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  document.getElementById('operatorInput').value = existing.operator || '';
+  document.getElementById('supervisorInput').value = existing.supervisor || '';
+  document.getElementById('remarkInput').value = existing.remark || '';
+
+  const radios = container.querySelectorAll('input[type="radio"]');
+  radios.forEach(r => r.addEventListener('change', updateSubmitState));
+  document.getElementById('operatorInput').addEventListener('input', updateSubmitState);
+  document.getElementById('supervisorInput').addEventListener('input', updateSubmitState);
+
+  updateSubmitState();
+}
+
+function updateSubmitState() {
+  const items = document.querySelectorAll('.check-item');
+  let allChecked = true;
+  items.forEach(item => {
+    const checked = item.querySelector('input[type="radio"]:checked');
+    if(!checked) allChecked = false;
+  });
+  const operator = document.getElementById('operatorInput').value.trim();
+  const supervisor = document.getElementById('supervisorInput').value.trim();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = !(allChecked && operator && supervisor);
+}
+
+document.getElementById('submitBtn').addEventListener('click', function() {
+  if(this.disabled) return;
+  const inst = instruments.find(i => i.id === currentInstrumentId);
+  if(!inst) return;
+
+  const items = {};
+  inst.items.forEach((_, idx) => {
+    const checked = document.querySelector('input[name="item_' + idx + '"]:checked');
+    items[idx] = checked ? checked.value : '';
+  });
+
+  const recordKey = getRecordKey(currentInstrumentId, selectedDate);
+  records[recordKey] = {
+    items,
+    operator: document.getElementById('operatorInput').value.trim(),
+    supervisor: document.getElementById('supervisorInput').value.trim(),
+    remark: document.getElementById('remarkInput').value.trim()
+  };
+  saveRecords();
+  renderCalendar();
+  showToast('✅ 点检结果已保存');
+});
+
+document.getElementById('exportMonthBtn').addEventListener('click', function() {
+  if(!currentInstrumentId) {
+    showToast('请先选择仪器');
+    return;
+  }
+  const inst = instruments.find(i => i.id === currentInstrumentId);
+  if(!inst) return;
+
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  let csv = '\ufeff仪器编号,' + inst.id + '\n';
+  csv += '仪器名称,' + inst.name + '\n';
+  csv += '日期,';
+  for(let d=1; d<=daysInMonth; d++) {
+    csv += currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0') + ',';
+  }
+  csv += '操作者,督导,备注\n';
+
+  inst.items.forEach((item, idx) => {
+    csv += '项目' + (idx+1) + ',"' + item + '",';
+    for(let d=1; d<=daysInMonth; d++) {
+      const dateStrVal = currentYear + '-' + String(currentMonth).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const key = getRecordKey(currentInstrumentId, dateStrVal);
+      const rec = records[key];
+      const val = rec && rec.items && rec.items[idx] ? rec.items[idx] : '';
+      const display = val === 'ok' ? '√' : (val === 'ng' ? '×' : (val === 'other' ? '△' : ''));
+      csv += display + ',';
+    }
+    csv += '\n';
+  });
+
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = inst.id + '_' + currentYear + '年' + currentMonth + '月点检记录.csv';
+  link.click();
+  showToast('📥 导出成功');
+});
+
+document.getElementById('printBtn').addEventListener('click', function() {
+  window.print();
+});
+
+document.getElementById('instrumentSelect').addEventListener('change', function() {
+  currentInstrumentId = this.value;
+  selectedDate = null;
+  renderCalendar();
+  document.getElementById('checklistCard').style.display = 'none';
+  if(currentInstrumentId) {
+    const today = dateStr(new Date());
+    selectedDate = today;
+    renderCalendar();
+    loadChecklistForDate(today);
+  }
+});
+
+document.getElementById('yearSelect').addEventListener('change', function() {
+  currentYear = parseInt(this.value);
+  selectedDate = null;
+  renderCalendar();
+  document.getElementById('checklistCard').style.display = 'none';
+});
+
+document.getElementById('monthSelect').addEventListener('change', function() {
+  currentMonth = parseInt(this.value);
+  selectedDate = null;
+  renderCalendar();
+  document.getElementById('checklistCard').style.display = 'none';
+});
+
+document.getElementById('todayBtn').addEventListener('click', function() {
+  const now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth() + 1;
+  document.getElementById('yearSelect').value = currentYear;
+  document.getElementById('monthSelect').value = currentMonth;
+  selectedDate = dateStr(now);
+  renderCalendar();
+  if(currentInstrumentId) {
+    loadChecklistForDate(selectedDate);
+  }
+});
+
+function updateQRCode() {
+  const siteUrl = 'https://h42520.github.io/dianjian/';
+  document.getElementById('siteUrlDisplay').textContent = siteUrl;
+  const qrImg = document.getElementById('qrImg');
+  qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(siteUrl);
+  qrImg.onerror = function() {
+    this.style.display = 'none';
+    document.querySelector('.qr-section p').textContent = '二维码加载失败，请直接访问网址';
+  };
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>
